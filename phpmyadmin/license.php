@@ -6,35 +6,18 @@
  * Note: please do not fold this script into a general script
  * that would read any file using a GET parameter, it would open a hole
  *
- * @package PhpMyAdmin
+ * @version $Id: license.php 12040 2008-11-30 12:58:55Z nijel $
+ * @package phpMyAdmin
  */
-use PhpMyAdmin\Response;
 
 /**
- * Gets core libraries and defines some variables
+ * Load paths.
  */
-require 'libraries/common.inc.php';
-
-$response = Response::getInstance();
-$response->disable();
+require('./libraries/vendor_config.php');
 
 /**
  *
  */
-header('Content-type: text/plain; charset=utf-8');
-
-$filename = LICENSE_FILE;
-
-// Check if the file is available, some distributions remove these.
-if (@is_readable($filename)) {
-    readfile($filename);
-} else {
-    printf(
-        __(
-            'The %s file is not available on this system, please visit ' .
-            '%s for more information.'
-        ),
-        $filename,
-        'https://www.phpmyadmin.net/'
-    );
-}
+header('Content-type: text/plain; charset=iso-8859-1');
+readfile(LICENSE_FILE);
+?>

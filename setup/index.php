@@ -1,58 +1,45 @@
 <?php
-/* vim: set expandtab sw=4 ts=4 sts=4: */
 /**
  * Front controller for setup script
  *
- * @package PhpMyAdmin-Setup
- * @license https://www.gnu.org/licenses/gpl.html GNU GPL 2.0
+ * @package    phpMyAdmin-setup
+ * @author     Piotr Przybylski <piotrprz@gmail.com>
+ * @copyright  Copyright (c) 2008, Piotr Przybylski <piotrprz@gmail.com>
+ * @license    http://www.gnu.org/licenses/gpl.html GNU GPL 2.0
+ * @version    $Id: index.php 11975 2008-11-24 09:55:30Z nijel $
  */
-
-use PhpMyAdmin\Core;
 
 /**
  * Core libraries.
  */
 require './lib/common.inc.php';
 
-if (@file_exists(CONFIG_FILE) && ! $cfg['DBG']['demo']) {
-    Core::fatalError(__('Configuration already exists, setup is disabled!'));
-}
-
-$page = Core::isValid($_GET['page'], 'scalar') ? $_GET['page'] : null;
+$page = filter_input(INPUT_GET, 'page');
 $page = preg_replace('/[^a-z]/', '', $page);
 if ($page === '') {
     $page = 'index';
 }
-if (!@file_exists("./setup/frames/$page.inc.php")) {
-    // it will happen only when entering URL by hand, we don't care for these cases
-    Core::fatalError(__('Wrong GET file attribute value'));
+if (!file_exists("./setup/frames/$page.inc.php")) {
+    // it will happen only when enterung URL by hand, we don't care for these cases
+    die('Wrong GET file attribute value');
 }
 
-// Handle done action info
-$action_done = Core::isValid($_GET['action_done'], 'scalar') ? $_GET['action_done'] : null;
-$action_done = preg_replace('/[^a-z_]/', '', $action_done);
-
-Core::noCacheHeader();
-
+// send no-cache headers
+require './libraries/header_http.inc.php';
 ?>
-<!DOCTYPE HTML>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-<meta charset="utf-8" />
-<title>phpMyAdmin setup</title>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>phpMyAdmin <?php echo $_SESSION['PMA_Config']->get('PMA_VERSION'); ?> setup</title>
 <link href="../favicon.ico" rel="icon" type="image/x-icon" />
 <link href="../favicon.ico" rel="shortcut icon" type="image/x-icon" />
 <link href="styles.css" rel="stylesheet" type="text/css" />
-<script type="text/javascript" src="../js/vendor/jquery/jquery.min.js"></script>
-<script type="text/javascript" src="../js/vendor/jquery/jquery-ui.min.js">
-</script>
-<script type="text/javascript" src="ajax.js"></script>
-<script type="text/javascript" src="../js/config.js"></script>
+<script type="text/javascript" src="../js/mootools.js"></script>
 <script type="text/javascript" src="scripts.js"></script>
-<script type="text/javascript" src="../js/messages.php"></script>
 </head>
 <body>
-<h1><span class="blue">php</span><span class="orange">MyAdmin</span>  setup</h1>
+<h1><span class="blue">php</span><span class="orange">MyAdmin</span> <?php echo $_SESSION['PMA_Config']->get('PMA_VERSION'); ?> setup</h1>
 <div id="menu">
 <?php
 require './setup/frames/menu.inc.php';

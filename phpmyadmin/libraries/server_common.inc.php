@@ -1,15 +1,23 @@
 <?php
 /* vim: set expandtab sw=4 ts=4 sts=4: */
 /**
- * Shared code for server pages
- *
- * @package PhpMyAdmin
+ * @uses    PMA_generate_common_url()
+ * @uses    PMA_isSuperuser()
+ * @uses    PMA_DBI_select_db()
+ * @uses    PMA_DBI_fetch_result()
+ * @uses    PMA_DBI_QUERY_STORE
+ * @uses    $userlink
+ * @version $Id: server_common.inc.php 11986 2008-11-24 11:05:40Z nijel $
+ * @package phpMyAdmin
  */
-use PhpMyAdmin\Url;
-
 if (! defined('PHPMYADMIN')) {
     exit;
 }
+
+/**
+ * Gets some core libraries
+ */
+require_once './libraries/common.inc.php';
 
 /**
  * Handles some variables that may have been sent by the calling script
@@ -24,20 +32,31 @@ if (empty($viewing_mode)) {
 /**
  * Set parameters for links
  */
-$GLOBALS['url_query'] = Url::getCommon();
+$url_query = PMA_generate_common_url($db);
 
 /**
  * Defines the urls to return to in case of error in a sql statement
  */
-$err_url = 'index.php' . $GLOBALS['url_query'];
+$err_url = 'main.php' . $url_query;
+
+/**
+ * Displays the headers
+ */
+require_once './libraries/header.inc.php';
 
 /**
  * @global boolean Checks for superuser privileges
  */
-$GLOBALS['is_grantuser'] = $GLOBALS['dbi']->isUserType('grant');
-$GLOBALS['is_createuser'] = $GLOBALS['dbi']->isUserType('create');
+$is_superuser = PMA_isSuperuser();
 
 // now, select the mysql db
-if ($GLOBALS['dbi']->isSuperuser()) {
-    $GLOBALS['dbi']->selectDb('mysql');
+if ($is_superuser) {
+    PMA_DBI_select_db('mysql', $userlink);
 }
+
+/**
+ * @global array binary log files
+ */
+$binary_logs = PMA_DBI_fetch_result('SHOW MASTER LOGS', 'Log_name', null, null,
+    PMA_DBI_QUERY_STORE);
+?>

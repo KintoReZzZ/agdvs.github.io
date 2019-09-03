@@ -1,25 +1,50 @@
 <?php
-/* vim: set expandtab sw=4 ts=4 sts=4: */
 /**
  * Form edit view
  *
- * @package PhpMyAdmin-Setup
+ * @package    phpMyAdmin-setup
+ * @author     Piotr Przybylski <piotrprz@gmail.com>
+ * @license    http://www.gnu.org/licenses/gpl.html GNU GPL 2.0
+ * @version    $Id: form.inc.php 11975 2008-11-24 09:55:30Z nijel $
  */
-
-use PhpMyAdmin\Config\Forms\Setup\SetupFormList;
-use PhpMyAdmin\Core;
-use PhpMyAdmin\Setup\FormProcessing;
 
 if (!defined('PHPMYADMIN')) {
     exit;
 }
 
-$formset_id = Core::isValid($_GET['formset'], 'scalar') ? $_GET['formset'] : null;
-$mode = isset($_GET['mode']) ? $_GET['mode'] : null;
-$form_class = SetupFormList::get($formset_id);
-if (is_null($form_class)) {
-    Core::fatalError(__('Incorrect form specified!'));
+/**
+ * Core libraries.
+ */
+require_once './setup/lib/Form.class.php';
+require_once './setup/lib/FormDisplay.class.php';
+require_once './setup/lib/form_processing.lib.php';
+
+$formsets = array(
+    'features' => array(
+        'forms' => array('Import_export', 'Security', 'Sql_queries', 'Other_core_settings')),
+    'left_frame' => array(
+        'forms' => array('Left_frame', 'Left_servers', 'Left_databases', 'Left_tables')),
+    'main_frame' => array(
+        'forms' => array('Startup', 'Browse', 'Edit', 'Tabs', 'Sql_box')),
+    'import' => array(
+        'forms' => array('Import_defaults')),
+    'export' => array(
+        'forms' => array('Export_defaults'))
+);
+
+$formset_id = filter_input(INPUT_GET, 'formset');
+$mode = filter_input(INPUT_GET, 'mode');
+if (!isset($formsets[$formset_id])) {
+    die('Incorrect formset, check $formsets array in setup/frames/form.inc.php');
 }
-echo '<h2>' , $form_class::getName() , '</h2>';
-$form_display = new $form_class($GLOBALS['ConfigFile']);
-FormProcessing::process($form_display);
+
+$formset = $formsets[$formset_id];
+if (isset($GLOBALS['strSetupFormset_' . $formset_id])) {
+    echo '<h2>' . $GLOBALS['strSetupFormset_' . $formset_id] . '</h2>';
+}
+$form_display = new FormDisplay();
+foreach ($formset['forms'] as $form_name) {
+    $form_display->registerForm($form_name);
+}
+process_formset($form_display);
+?>

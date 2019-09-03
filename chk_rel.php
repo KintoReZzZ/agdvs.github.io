@@ -1,36 +1,28 @@
 <?php
 /* vim: set expandtab sw=4 ts=4 sts=4: */
 /**
- * Displays status of phpMyAdmin configuration storage
  *
- * @package PhpMyAdmin
+ * @version $Id: chk_rel.php 12278 2009-03-03 13:54:37Z nijel $
+ * @package phpMyAdmin
  */
-use PhpMyAdmin\Relation;
-use PhpMyAdmin\Response;
 
-require_once 'libraries/common.inc.php';
+/**
+ * Gets some core libraries
+ */
+require_once './libraries/common.inc.php';
+$GLOBALS['js_include'][] = 'functions.js';
+require_once './libraries/header.inc.php';
+require_once './libraries/relation.lib.php';
 
-$relation = new Relation();
 
-// If request for creating the pmadb
-if (isset($_POST['create_pmadb'])) {
-    if ($relation->createPmaDatabase()) {
-        $relation->fixPmaTables('phpmyadmin');
-    }
-}
+/**
+ * Gets the relation settings
+ */
+$cfgRelation = PMA_getRelationsParam(TRUE);
 
-// If request for creating all PMA tables.
-if (isset($_POST['fixall_pmadb'])) {
-    $relation->fixPmaTables($GLOBALS['db']);
-}
 
-$cfgRelation = $relation->getRelationsParam();
-// If request for creating missing PMA tables.
-if (isset($_POST['fix_pmadb'])) {
-    $relation->fixPmaTables($cfgRelation['db']);
-}
-
-$response = Response::getInstance();
-$response->addHTML(
-    $relation->getRelationsParamDiagnostic($cfgRelation)
-);
+/**
+ * Displays the footer
+ */
+require_once './libraries/footer.inc.php';
+?>

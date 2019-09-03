@@ -1,177 +1,158 @@
 <?php
 /* vim: set expandtab sw=4 ts=4 sts=4: */
 /**
- * handle row specific actions like edit, delete, export
+ * handle row specifc actions like edit, delete, export
  *
- * @package PhpMyAdmin
+ * @version $Id: tbl_row_action.php 12390 2009-05-04 16:05:24Z lem9 $
+ * @package phpMyAdmin
  */
 
-use PhpMyAdmin\Response;
-use PhpMyAdmin\Sql;
-use PhpMyAdmin\Url;
+
+/**
+ * do not globalize/import request variables
+ * can only be enabled if all included files are switched superglobals too
+ * but leave this here to show that this file is 'superglobalized'
+define('PMA_NO_VARIABLES_IMPORT', true);
+ */
 
 /**
  *
  */
-require_once 'libraries/common.inc.php';
+require_once './libraries/common.inc.php';
+require_once './libraries/mysql_charsets.lib.php';
 
-if (isset($_POST['submit_mult'])) {
-    $submit_mult = $_POST['submit_mult'];
-    // workaround for IE problem:
-} elseif (isset($_POST['submit_mult_delete_x'])) {
+/**
+ * No rows were selected => show again the query and tell that user.
+ */
+if (! PMA_isValid($_REQUEST['rows_to_delete'], 'array')
+ && ! isset($_REQUEST['mult_btn'])) {
+    $disp_message = $strNoRowsSelected;
+    $disp_query = '';
+    require './sql.php';
+    require_once './libraries/footer.inc.php';
+}
+
+if (isset($_REQUEST['submit_mult'])) {
+    $submit_mult = $_REQUEST['submit_mult'];
+// workaround for IE problem:
+} elseif (isset($_REQUEST['submit_mult_delete_x'])) {
     $submit_mult = 'row_delete';
-} elseif (isset($_POST['submit_mult_change_x'])) {
+} elseif (isset($_REQUEST['submit_mult_change_x'])) {
     $submit_mult = 'row_edit';
-} elseif (isset($_POST['submit_mult_export_x'])) {
+} elseif (isset($_REQUEST['submit_mult_export_x'])) {
     $submit_mult = 'row_export';
 }
 
-// If the 'Ask for confirmation' button was pressed, this can only come
+// garvin: If the 'Ask for confirmation' button was pressed, this can only come
 // from 'delete' mode, so we set it straight away.
-if (isset($_POST['mult_btn'])) {
+if (isset($_REQUEST['mult_btn'])) {
     $submit_mult = 'row_delete';
-}
-
-if (! isset($submit_mult)) {
-    $submit_mult = 'row_edit';
 }
 
 switch($submit_mult) {
-case 'row_delete':
-case 'row_edit':
-case 'row_copy':
-case 'row_export':
-    // leave as is
-    break;
+    case 'row_delete':
+    case 'row_edit':
+    case 'row_export':
+        // leave as is
+        break;
 
-case 'export':
-    $submit_mult = 'row_export';
-    break;
+    case $GLOBALS['strExport']:
+        $submit_mult = 'row_export';
+        break;
 
-case 'delete':
-    $submit_mult = 'row_delete';
-    break;
+    case $GLOBALS['strDelete']:
+    case $GLOBALS['strKill']:
+        $submit_mult = 'row_delete';
+        break;
 
-case 'copy':
-    $submit_mult = 'row_copy';
-    break;
-
-case 'edit':
-default:
-    $submit_mult = 'row_edit';
-    break;
+    default:
+    case $GLOBALS['strEdit']:
+        $submit_mult = 'row_edit';
+        break;
 }
+
+$GLOBALS['js_include'][] = 'tbl_change.js';
+$GLOBALS['js_include'][] = 'functions.js';
+
+require_once './libraries/header.inc.php';
 
 if (!empty($submit_mult)) {
-
-    if (isset($_POST['goto'])
-        && (! isset($_POST['rows_to_delete'])
-        || ! is_array($_POST['rows_to_delete']))
-    ) {
-        $response = Response::getInstance();
-        $response->setRequestStatus(false);
-        $response->addJSON('message', __('No row selected.'));
-    }
-
     switch($submit_mult) {
-    /** @noinspection PhpMissingBreakStatementInspection */
-    case 'row_copy':
-        $_POST['default_action'] = 'insert';
-        // no break to allow for fallthough
-    case 'row_edit':
-        // As we got the rows to be edited from the
-        // 'rows_to_delete' checkbox, we use the index of it as the
-        // indicating WHERE clause. Then we build the array which is used
-        // for the tbl_change.php script.
-        $where_clause = array();
-        if (isset($_POST['rows_to_delete'])
-            && is_array($_POST['rows_to_delete'])
-        ) {
-            foreach ($_POST['rows_to_delete'] as $i => $i_where_clause) {
-                $where_clause[] = $i_where_clause;
+        case 'row_edit':
+            // garvin: As we got the fields to be edited from the 'rows_to_delete'
+            // checkbox, we use the index of it as the
+            // indicating primary key. Then we built the array which is used for
+            // the tbl_change.php script.
+            $primary_key = array();
+            foreach ($_REQUEST['rows_to_delete'] as $i_primary_key => $del_query) {
+                $primary_key[] = urldecode($i_primary_key);
             }
-        }
-        $active_page = 'tbl_change.php';
-        include 'tbl_change.php';
-        break;
 
-    case 'row_export':
-        // Needed to allow SQL export
-        $single_table = true;
+            $active_page = 'tbl_change.php';
+            include './tbl_change.php';
+            break;
 
-        // As we got the rows to be exported from the
-        // 'rows_to_delete' checkbox, we use the index of it as the
-        // indicating WHERE clause. Then we build the array which is used
-        // for the tbl_change.php script.
-        $where_clause = array();
-        if (isset($_POST['rows_to_delete'])
-            && is_array($_POST['rows_to_delete'])
-        ) {
-            foreach ($_POST['rows_to_delete'] as $i => $i_where_clause) {
-                $where_clause[] = $i_where_clause;
+        case 'row_export':
+            // Needed to allow SQL export
+            $single_table = TRUE;
+
+            //$sql_query = urldecode($sql_query);
+            // garvin: As we got the fields to be edited from the 'rows_to_delete'
+            // checkbox, we use the index of it as the
+            // indicating primary key. Then we built the array which is used for
+            // the tbl_change.php script.
+            $primary_key = array();
+            foreach ($_REQUEST['rows_to_delete'] as $i_primary_key => $del_query) {
+                $primary_key[] = urldecode($i_primary_key);
             }
-        }
-        $active_page = 'tbl_export.php';
-        include 'tbl_export.php';
-        break;
 
-    case 'row_delete':
-    default:
-        $action = 'tbl_row_action.php';
-        $err_url = 'tbl_row_action.php'
-            . Url::getCommon($GLOBALS['url_params']);
-        if (! isset($_POST['mult_btn'])) {
-            $original_sql_query = $sql_query;
-            if (! empty($url_query)) {
+            $active_page = 'tbl_export.php';
+            include './tbl_export.php';
+            break;
+
+        case 'row_delete':
+        default:
+            $action = 'tbl_row_action.php';
+            $err_url = 'tbl_row_action.php' . PMA_generate_common_url($GLOBALS['url_params']);
+            if (! isset($_REQUEST['mult_btn'])) {
+                $original_sql_query = $sql_query;
                 $original_url_query = $url_query;
             }
-        }
-        include 'libraries/mult_submits.inc.php';
-        $_url_params = $GLOBALS['url_params'];
-        $_url_params['goto'] = 'tbl_sql.php';
-        $url_query = Url::getCommon($_url_params);
+            require './libraries/mult_submits.inc.php';
+            $_url_params = $GLOBALS['url_params'];
+            $_url_params['goto'] = 'tbl_sql.php';
+            $url_query = PMA_generate_common_url($_url_params);
 
 
-        /**
-         * Show result of multi submit operation
-         */
-        // sql_query is not set when user does not confirm multi-delete
-        if ((! empty($submit_mult) || isset($_POST['mult_btn']))
-            && ! empty($sql_query)
-        ) {
-            $disp_message = __('Your SQL query has been executed successfully.');
-            $disp_query = $sql_query;
-        }
+            /**
+             * Show result of multi submit operation
+             */
+            // sql_query is not set when user does not confirm multi-delete
+            if ((!empty($submit_mult) || isset($_REQUEST['mult_btn'])) && ! empty($sql_query)) {
+                $disp_message = $strSuccess;
+                $disp_query = $sql_query;
+            }
 
-        if (isset($original_sql_query)) {
-            $sql_query = $original_sql_query;
-        }
+            if (isset($original_sql_query)) {
+                $sql_query = $original_sql_query;
+            }
 
-        if (isset($original_url_query)) {
-            $url_query = $original_url_query;
-        }
+            if (isset($original_url_query)) {
+                $url_query = $original_url_query;
+            }
 
-        $active_page = 'sql.php';
-        $sql = new Sql();
-        $sql->executeQueryAndSendQueryResponse(
-            null, // analyzed_sql_results
-            false, // is_gotofile
-            $db, // db
-            $table, // table
-            null, // find_real_end
-            null, // sql_query_for_bookmark
-            null, // extra_data
-            null, // message_to_show
-            null, // message
-            null, // sql_data
-            $goto, // goto
-            $pmaThemeImage, // pmaThemeImage
-            null, // disp_query
-            null, // disp_message
-            null, // query_type
-            $sql_query, // sql_query
-            null, // selectedTables
-            null // complete_query
-        );
+            // this is because sql.php could call tbl_structure
+            // which would think it needs to call mult_submits.inc.php:
+            unset($submit_mult, $_REQUEST['mult_btn']);
+
+            $active_page = 'sql.php';
+            require './sql.php';
+
+            /**
+             * Displays the footer
+             */
+            require_once './libraries/footer.inc.php';
+            break;
     }
 }
+?>

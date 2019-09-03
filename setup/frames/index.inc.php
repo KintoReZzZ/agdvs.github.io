@@ -1,238 +1,217 @@
 <?php
-/* vim: set expandtab sw=4 ts=4 sts=4: */
 /**
  * Overview (main page)
  *
- * @package PhpMyAdmin-Setup
+ * @package    phpMyAdmin-setup
+ * @author     Piotr Przybylski <piotrprz@gmail.com>
+ * @license    http://www.gnu.org/licenses/gpl.html GNU GPL 2.0
+ * @version    $Id: index.inc.php 11975 2008-11-24 09:55:30Z nijel $
  */
-
-use PhpMyAdmin\Config\ConfigFile;
-use PhpMyAdmin\Config\FormDisplay;
-use PhpMyAdmin\Config\FormDisplayTemplate;
-use PhpMyAdmin\Config\ServerConfigChecks;
-use PhpMyAdmin\Core;
-use PhpMyAdmin\LanguageManager;
-use PhpMyAdmin\Sanitize;
-use PhpMyAdmin\Setup\Index as SetupIndex;
-use PhpMyAdmin\Url;
 
 if (!defined('PHPMYADMIN')) {
     exit;
 }
 
-// prepare unfiltered language list
-$all_languages = LanguageManager::getInstance()->sortedLanguages();
+/**
+ * Core libraries.
+ */
+require_once './libraries/display_select_lang.lib.php';
+require_once './setup/lib/FormDisplay.class.php';
+require_once './setup/lib/index.lib.php';
 
-/** @var ConfigFile $cf */
-$cf = $GLOBALS['ConfigFile'];
+// prepare unfiltered language list
+$all_languages = PMA_langList();
+uasort($all_languages, 'PMA_language_cmp');
+
+$cf = ConfigFile::getInstance();
+$separator = PMA_get_arg_separator('html');
 
 // message handling
-SetupIndex::messagesBegin();
+messages_begin();
 
 //
 // Check phpMyAdmin version
 //
 if (isset($_GET['version_check'])) {
-    SetupIndex::versionCheck();
+    PMA_version_check();
 }
 
 //
 // Perform various security, compatibility and consistency checks
 //
-$configChecker = new ServerConfigChecks($GLOBALS['ConfigFile']);
-$configChecker->performConfigChecks();
+perform_config_checks();
 
 //
-// Https connection warning (check done on the client side)
+// Check whether we can read/write configuration
 //
-$text = __(
-    'You are not using a secure connection; all data (including potentially '
-    . 'sensitive information, like passwords) is transferred unencrypted!'
-);
-$text .= ' <a href="#">';
-$text .= __(
-    'If your server is also configured to accept HTTPS requests '
-    . 'follow this link to use a secure connection.'
-);
-$text .= '</a>';
-SetupIndex::messagesSet('notice', 'no_https', __('Insecure connection'), $text);
-
-echo '<form id="select_lang" method="post">';
-echo Url::getHiddenInputs();
-echo '<bdo lang="en" dir="ltr"><label for="lang">';
-echo __('Language') , (__('Language') != 'Language' ? ' - Language' : '');
-echo '</label></bdo><br />';
-echo '<select id="lang" name="lang" class="autosubmit" lang="en" dir="ltr">';
-
-// create language list
-$lang_list = array();
-foreach ($all_languages as $each_lang) {
-    //Is current one active?
-    $selected = $each_lang->isActive() ? ' selected="selected"' : '';
-    echo '<option value="' , $each_lang->getCode() , '"' , $selected , '>' , $each_lang->getName()
-        , '</option>' , "\n";
+$config_readable = false;
+$config_writable = false;
+$config_exists = false;
+check_config_rw($config_readable, $config_writable, $config_exists);
+if (!$config_writable || !$config_readable) {
+    messages_set('error', 'config_rw', 'CannotLoadConfig', PMA_lang('CannotLoadConfigMsg'));
 }
-
-echo '</select>';
-echo '</form>';
-
-// Check for done action info and set notice message if present
-switch ($action_done) {
-case 'config_saved':
-    /* Use uniqid to display this message every time configuration is saved */
-    SetupIndex::messagesSet(
-        'notice', uniqid('config_saved'), __('Configuration saved.'),
-        Sanitize::sanitize(
-            __(
-                'Configuration saved to file config/config.inc.php in phpMyAdmin '
-                . 'top level directory, copy it to top level one and delete '
-                . 'directory config to use it.'
-            )
-        )
-    );
-    break;
-case 'config_not_saved':
-    /* Use uniqid to display this message every time configuration is saved */
-    SetupIndex::messagesSet(
-        'notice', uniqid('config_not_saved'), __('Configuration not saved!'),
-        Sanitize::sanitize(
-            __(
-                'Please create web server writable folder [em]config[/em] in '
-                . 'phpMyAdmin top level directory as described in '
-                . '[doc@setup_script]documentation[/doc]. Otherwise you will be '
-                . 'only able to download or display it.'
-            )
-        )
-    );
-    break;
-default:
-    break;
+//
+// Check https connection
+//
+$is_https = !empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) == 'on';
+if (!$is_https) {
+    $text = $GLOBALS['strSetupInsecureConnectionMsg1'];
+    if (!empty($_SERVER['REQUEST_URI']) && !empty($_SERVER['HTTP_HOST'])) {
+        $text .= ' ' . PMA_lang('InsecureConnectionMsg2',
+            'https://' . htmlspecialchars($_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']));
+    }
+    messages_set('warning', 'no_https', 'InsecureConnection', $text);
 }
+?>
 
-echo '<h2>' , __('Overview') , '</h2>';
+<form id="select_lang" method="post" action="<?php echo htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+    <?php echo PMA_generate_common_hidden_inputs() ?>
+    <bdo xml:lang="en" dir="ltr"><label for="lang">
+    <?php echo $GLOBALS['strLanguage'] . ($GLOBALS['strLanguage'] != 'Language' ? ' - Language' : '') ?>
+    </label></bdo><br />
+    <select id="lang" name="lang" onchange="this.form.submit();" xml:lang="en" dir="ltr">
+    <?php
+    // create language list
+    $lang_list = array();
+    foreach ($all_languages as $each_lang_key => $each_lang) {
+        if (!file_exists($GLOBALS['lang_path'] . $each_lang[1] . '.inc.php')) {
+            continue;
+        }
 
+        $lang_name = ucfirst(substr(strrchr($each_lang[0], '|'), 1));
+        // Include native name if non empty
+        if (!empty($each_lang[3])) {
+            $lang_name = $each_lang[3] . ' - ' . $lang_name;
+        }
+
+        //Is current one active?
+        $selected = ($GLOBALS['lang'] == $each_lang_key) ? ' selected="selected"' : '';
+        echo '<option value="' . $each_lang_key . '"' . $selected . '>' . $lang_name
+            . '</option>' . "\n";
+    }
+    ?>
+    </select>
+</form>
+
+<h2><?php echo $GLOBALS['strSetupOverview'] ?></h2>
+
+<?php
 // message handling
-SetupIndex::messagesEnd();
-SetupIndex::messagesShowHtml();
+messages_end();
+messages_show_html();
+?>
 
-echo '<a href="#" id="show_hidden_messages" class="hide">';
-echo __('Show hidden messages (#MSG_COUNT)');
-echo '</a>';
+<a href="#" id="show_hidden_messages" style="display:none"><?php echo $GLOBALS['strSetupShowHiddenMessages'] ?></a>
 
-echo '<fieldset class="simple"><legend>';
-echo __('Servers');
-echo '</legend>';
-
+<h3><?php echo $GLOBALS['strServers'] ?></h3>
+<?php
 //
 // Display server list
 //
-echo FormDisplayTemplate::displayFormTop(
-    'index.php', 'get',
-    array(
-        'page' => 'servers',
-        'mode' => 'add'
-    )
-);
-echo '<div class="form">';
-if ($cf->getServerCount() > 0) {
-    echo '<table cellspacing="0" class="datatable">';
-    echo '<tr>';
-    echo '<th>#</th>';
-    echo '<th>' , __('Name') , '</th>';
-    echo '<th>' , __('Authentication type') , '</th>';
-    echo '<th colspan="2">DSN</th>';
-    echo '</tr>';
+display_form_top('index.php', 'get', array(
+    'page' => 'servers',
+    'mode' => 'add'
+));
+?>
+<div class="form">
+<?php if ($cf->getServerCount() > 0): ?>
+<table cellspacing="0" class="datatable" style="table-layout: fixed">
+<tr>
+    <th>#</th>
+    <th><?php echo $GLOBALS['strName'] ?></th>
+    <th>Authentication type</th>
+    <th colspan="2">DSN</th>
+</tr>
+<?php foreach ($_SESSION['ConfigFile']['Servers'] as $id => $server): ?>
+<tr>
+    <td><?php echo $id ?></td>
+    <td><?php echo $cf->getServerName($id) ?></td>
+    <td><?php echo htmlspecialchars($cf->getValue("Servers/$id/auth_type")) ?></td>
+    <td><?php echo htmlspecialchars($cf->getServerDSN($id)) ?></td>
+    <td style="white-space: nowrap">
+        <small>
+        <a href="<?php echo "?page=servers{$separator}mode=edit{$separator}id=$id" ?>"><?php echo $GLOBALS['strEdit'] ?></a>
+        | <a href="<?php echo "?page=servers{$separator}mode=remove{$separator}id=$id" ?>"><?php echo $GLOBALS['strDelete'] ?></a>
+        </small>
+    </td>
+</tr>
+<?php endforeach; ?>
+</table>
+<?php else: ?>
+<table width="100%">
+<tr>
+    <td>
+        <i><?php echo $GLOBALS['strSetupNoServers'] ?></i>
+    </td>
+</tr>
+</table>
+<?php endif; ?>
+<table width="100%">
+<tr>
+    <td class="lastrow" style="text-align: left">
+        <input type="submit" name="submit" value="<?php echo $GLOBALS['strSetupNewServer'] ?>" />
+    </td>
+</tr>
+</table>
+</div>
+<?php
+display_form_bottom();
+?>
 
-    foreach ($cf->getServers() as $id => $server) {
-        echo '<tr>';
-        echo '<td>' , $id  , '</td>';
-        echo '<td>' , htmlspecialchars($cf->getServerName($id)) , '</td>';
-        echo '<td>'
-            , htmlspecialchars($cf->getValue("Servers/$id/auth_type"))
-            ,  '</td>';
-        echo '<td>' , htmlspecialchars($cf->getServerDSN($id)) , '</td>';
-        echo '<td class="nowrap">';
-        echo '<small>';
-        echo '<a href="' , Url::getCommon(array('page' => 'servers', 'mode' => 'edit', 'id' => $id)), '">'
-            , __('Edit') , '</a>';
-        echo ' | ';
-        echo '<a href="' , Url::getCommon(array('page' => 'servers', 'mode' => 'remove', 'id' => $id)), '">'
-            , __('Delete') , '</a>';
-        echo '</small>';
-        echo '</td>';
-        echo '</tr>';
-    }
-    echo '</table>';
-} else {
-    echo '<table width="100%">';
-    echo '<tr>';
-    echo '<td>';
-    echo '<i>' , __('There are no configured servers') , '</i>';
-    echo '</td>';
-    echo '</tr>';
-    echo '</table>';
-}
-
-echo '<table width="100%">';
-echo '<tr>';
-echo '<td class="lastrow left">';
-echo '<input type="submit" name="submit" value="' , __('New server') , '" />';
-echo '</td>';
-echo '</tr>';
-echo '</table>';
-echo '</div>';
-
-echo FormDisplayTemplate::displayFormBottom();
-
-echo '</fieldset>';
-
-echo '<fieldset class="simple"><legend>' , __('Configuration file') , '</legend>';
-
+<h3><?php echo $GLOBALS['strSetupConfigurationFile'] ?></h3>
+<?php
 //
 // Display config file settings and load/save form
 //
-$form_display = new FormDisplay($cf);
+$form_display = new FormDisplay();
 
-echo FormDisplayTemplate::displayFormTop('config.php');
-echo '<table width="100%" cellspacing="0">';
+display_form_top('config.php');
+display_fieldset_top('', '', null, array('class' => 'simple'));
 
 // Display language list
 $opts = array(
     'doc' => $form_display->getDocLink('DefaultLang'),
+    'wiki' => $form_display->getWikiLink('DefaultLang'),
     'values' => array(),
     'values_escaped' => true);
-foreach ($all_languages as $each_lang) {
-    $opts['values'][$each_lang->getCode()] = $each_lang->getName();
+foreach ($all_languages as $each_lang_key => $each_lang) {
+    if (!file_exists($GLOBALS['lang_path'] . $each_lang[1] . '.inc.php')) {
+        continue;
+    }
+    $lang_name = ucfirst(substr(strrchr($each_lang[0], '|'), 1));
+    // Include native name if non empty
+    if (!empty($each_lang[3])) {
+        $lang_name = $each_lang[3] . ' - ' . $lang_name;
+    }
+    $opts['values'][$each_lang_key] = $lang_name;
 }
-echo FormDisplayTemplate::displayInput(
-    'DefaultLang', __('Default language'), 'select',
-    $cf->getValue('DefaultLang'), '', true, $opts
-);
+display_input('DefaultLang', $GLOBALS['strSetupDefaultLanguage'], '', 'select',
+    $cf->getValue('DefaultLang'), true, $opts);
 
 // Display server list
 $opts = array(
     'doc' => $form_display->getDocLink('ServerDefault'),
+    'wiki' => $form_display->getWikiLink('ServerDefault'),
     'values' => array(),
     'values_disabled' => array());
 if ($cf->getServerCount() > 0) {
-    $opts['values']['0'] = __('let the user choose');
+    $opts['values']['0'] = $GLOBALS['strSetupLetUserChoose'];
     $opts['values']['-'] = '------------------------------';
     if ($cf->getServerCount() == 1) {
         $opts['values_disabled'][] = '0';
     }
     $opts['values_disabled'][] = '-';
 
-    foreach ($cf->getServers() as $id => $server) {
+    foreach ($_SESSION['ConfigFile']['Servers'] as $id => $server) {
         $opts['values'][(string)$id] = $cf->getServerName($id) . " [$id]";
     }
 } else {
-    $opts['values']['1'] = __('- none -');
+    $opts['values']['1'] = $GLOBALS['strSetupOptionNone'];
     $opts['values_escaped'] = true;
 }
-echo FormDisplayTemplate::displayInput(
-    'ServerDefault', __('Default server'), 'select',
-    $cf->getValue('ServerDefault'), '', true, $opts
-);
+display_input('ServerDefault', $GLOBALS['strSetupDefaultServer'], '', 'select',
+    $cf->getValue('ServerDefault'), true, $opts);
 
 // Display EOL list
 $opts = array(
@@ -240,30 +219,28 @@ $opts = array(
         'unix' => 'UNIX / Linux (\n)',
         'win' => 'Windows (\r\n)'),
     'values_escaped' => true);
-$eol = Core::ifSetOr($_SESSION['eol'], (PMA_IS_WINDOWS ? 'win' : 'unix'));
-echo FormDisplayTemplate::displayInput(
-    'eol', __('End of line'), 'select',
-    $eol, '', true, $opts
-);
-
-echo '<tr>';
-echo '<td colspan="2" class="lastrow left">';
-echo '<input type="submit" name="submit_display" value="' , __('Display') , '" />';
-echo '<input type="submit" name="submit_download" value="' , __('Download') , '" />';
-echo '&nbsp; &nbsp;';
-echo '<input type="submit" name="submit_clear" value="' , __('Clear')
-    , '" class="red" />';
-echo '</td>';
-echo '</tr>';
-echo '</table>';
-
-echo FormDisplayTemplate::displayFormBottom();
-
-echo '</fieldset>';
-echo '<div id="footer">';
-echo '<a href="../url.php?url=https://www.phpmyadmin.net/">' , __('phpMyAdmin homepage') , '</a>';
-echo '<a href="../url.php?url=https://www.phpmyadmin.net/donate/">'
-    ,  __('Donate') , '</a>';
-echo '<a href="' ,  Url::getCommon(array('version_check' => '1')), '">'
-    , __('Check for latest version') , '</a>';
-echo '</div>';
+$eol = PMA_ifSetOr($_SESSION['eol'], (PMA_IS_WINDOWS ? 'win' : 'unix'));
+display_input('eol', $GLOBALS['strSetupEndOfLine'], '', 'select',
+    $eol, true, $opts);
+?>
+<tr>
+    <td colspan="2" class="lastrow" style="text-align: left">
+        <input type="submit" name="submit_display" value="<?php echo $GLOBALS['strSetupDisplay'] ?>" />
+        <input type="submit" name="submit_download" value="<?php echo $GLOBALS['strSetupDownload'] ?>" />
+        &nbsp; &nbsp;
+        <input type="submit" name="submit_save" value="<?php echo $GLOBALS['strSave'] ?>"<?php if (!$config_writable) echo ' disabled="disabled"' ?> />
+        <input type="submit" name="submit_load" value="<?php echo $GLOBALS['strSetupLoad'] ?>"<?php if (!$config_exists) echo ' disabled="disabled"' ?> />
+        <input type="submit" name="submit_delete" value="<?php echo $GLOBALS['strDelete'] ?>"<?php if (!$config_exists || !$config_writable) echo ' disabled="disabled"' ?> />
+        &nbsp; &nbsp;
+        <input type="submit" name="submit_clear" value="<?php echo $GLOBALS['strSetupClear'] ?>" class="red" />
+    </td>
+</tr>
+<?php
+display_fieldset_bottom_simple();
+display_form_bottom();
+?>
+<div id="footer">
+    <a href="http://phpmyadmin.net"><?php echo $GLOBALS['strSetupHomepageLink'] ?></a>
+    <a href="http://sourceforge.net/donate/index.php?group_id=23067"><?php echo $GLOBALS['strSetupDonateLink'] ?></a>
+    <a href="?version_check=1<?php echo "{$separator}token=" . $_SESSION[' PMA_token '] ?>"><?php echo $GLOBALS['strSetupVersionCheckLink'] ?></a>
+</div>

@@ -2,27 +2,14 @@
 /* vim: set expandtab sw=4 ts=4 sts=4: */
 /**
  * File for vendor customisation, you can change here paths or some behaviour,
- * which vendors such as Linux distributions might want to change.
+ * which vendors such as Linux distibutions might want to change.
  *
  * For changing this file you should know what you are doing. For this reason
  * options here are not part of normal configuration.
  *
- * @package PhpMyAdmin
+ * @version $Id: vendor_config.php 12081 2008-12-05 00:25:59Z lem9 $
+ * @package phpMyAdmin
  */
-if (! defined('PHPMYADMIN')) {
-    exit;
-}
-
-/**
- * Path to vendor autoload file. Useful when you want to
- * have have vendor dependencies somewhere else.
- */
-define('AUTOLOAD_FILE', './vendor/autoload.php');
-
-/**
- * Directory where cache files are stored.
- */
-define('TEMP_DIR', './tmp/');
 
 /**
  * Path to changelog file, can be gzip compressed. Useful when you want to
@@ -37,44 +24,21 @@ define('CHANGELOG_FILE', './ChangeLog');
 define('LICENSE_FILE', './LICENSE');
 
 /**
- * Directory where SQL scripts to create/upgrade configuration storage reside.
+ * Path to config file generated using setup script.
  */
-define('SQL_DIR', './sql/');
+define('SETUP_CONFIG_FILE', './config/config.inc.php');
 
 /**
- * Directory where configuration files are stored.
- * It is not used directly in code, just a convenient
- * define used further in this file.
+ * Whether setup requires writable directory where config
+ * file will be generated.
  */
-define('CONFIG_DIR', '');
+define('SETUP_DIR_WRITABLE', true);
 
 /**
- * Filename of a configuration file.
+ * Whether to skip mtime check on config file and load it on every request.
+ * This has slight performance drawback, but it is the only way to handle
+ * inclusions of other php scripts from config.
  */
-define('CONFIG_FILE', CONFIG_DIR . 'config.inc.php');
+define('SKIP_MTIME_CONFIG_CHECK', false);
 
-/**
- * Filename of custom header file.
- */
-define('CUSTOM_HEADER_FILE', CONFIG_DIR . 'config.header.inc.php');
-
-/**
- * Filename of custom footer file.
- */
-define('CUSTOM_FOOTER_FILE', CONFIG_DIR . 'config.footer.inc.php');
-
-/**
- * Default value for check for version upgrades.
- */
-define('VERSION_CHECK_DEFAULT', true);
-
-/**
- * Path to files with compiled locales (*.mo)
- */
-define('LOCALE_PATH', './locale/');
-
-/**
- * Avoid referring to nonexistent files (causes warnings when open_basedir
- * is used)
- */
-define('K_PATH_IMAGES', '');
+?>

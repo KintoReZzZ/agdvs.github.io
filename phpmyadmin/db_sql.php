@@ -1,32 +1,21 @@
 <?php
 /* vim: set expandtab sw=4 ts=4 sts=4: */
 /**
- * Database SQL executor
  *
- * @package PhpMyAdmin
+ * @version $Id: db_sql.php 11982 2008-11-24 10:32:56Z nijel $
+ * @package phpMyAdmin
  */
-use PhpMyAdmin\Config\PageSettings;
-use PhpMyAdmin\Response;
-use PhpMyAdmin\SqlQueryForm;
 
 /**
  *
  */
-require_once 'libraries/common.inc.php';
-
-PageSettings::showGroup('Sql');
+require_once './libraries/common.inc.php';
 
 /**
  * Runs common work
  */
-$response = Response::getInstance();
-$header   = $response->getHeader();
-$scripts  = $header->getScripts();
-$scripts->addFile('makegrid.js');
-$scripts->addFile('vendor/jquery/jquery.uitablefilter.js');
-$scripts->addFile('sql.js');
-
-require 'libraries/db_common.inc.php';
+require './libraries/db_common.inc.php';
+require_once './libraries/sql_query_form.lib.php';
 
 // After a syntax error, we return to this script
 // with the typed query in the textarea.
@@ -34,13 +23,24 @@ $goto = 'db_sql.php';
 $back = 'db_sql.php';
 
 /**
+ * Gets informations about the database and, if it is empty, move to the
+ * "db_structure.php" script where table can be created
+ */
+require './libraries/db_info.inc.php';
+if ($num_tables == 0 && empty($db_query_force)) {
+    $sub_part   = '';
+    $is_info    = TRUE;
+    require './db_structure.php';
+    exit();
+}
+
+/**
  * Query box, bookmark, insert data from textfile
  */
-$response->addHTML(
-    SqlQueryForm::getHtml(
-        true, false,
-        isset($_POST['delimiter'])
-        ? htmlspecialchars($_POST['delimiter'])
-        : ';'
-    )
-);
+PMA_sqlQueryForm(true, false, isset($_REQUEST['delimiter']) ? $_REQUEST['delimiter'] : ';');
+
+/**
+ * Displays the footer
+ */
+require_once './libraries/footer.inc.php';
+?>

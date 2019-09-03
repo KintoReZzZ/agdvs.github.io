@@ -1,39 +1,46 @@
 <?php
-/* vim: set expandtab sw=4 ts=4 sts=4: */
 /**
  * Config file view and save screen
  *
- * @package PhpMyAdmin-Setup
+ * @package    phpMyAdmin-setup
+ * @author     Piotr Przybylski <piotrprz@gmail.com>
+ * @license    http://www.gnu.org/licenses/gpl.html GNU GPL 2.0
+ * @version    $Id: config.inc.php 12348 2009-04-14 10:19:02Z nijel $
  */
-
-use PhpMyAdmin\Config\FormDisplayTemplate;
-use PhpMyAdmin\Core;
-use PhpMyAdmin\Setup\ConfigGenerator;
 
 if (!defined('PHPMYADMIN')) {
     exit;
 }
 
-echo '<h2>' , __('Configuration file') , '</h2>';
+/**
+ * Core libraries.
+ */
+require_once './setup/lib/FormDisplay.class.php';
+require_once './setup/lib/index.lib.php';
 
-echo FormDisplayTemplate::displayFormTop('config.php');
-echo '<input type="hidden" name="eol" value="'
-    , htmlspecialchars(Core::ifSetOr($_GET['eol'], 'unix')) , '" />';
-echo FormDisplayTemplate::displayFieldsetTop('config.inc.php', '', null, array('class' => 'simple'));
-echo '<tr>';
-echo '<td>';
-echo '<textarea cols="50" rows="20" name="textconfig" '
-    , 'id="textconfig" spellcheck="false">';
-echo htmlspecialchars(ConfigGenerator::getConfigFile($GLOBALS['ConfigFile']));
-echo '</textarea>';
-echo '</td>';
-echo '</tr>';
-echo '<tr>';
-echo '<td class="lastrow" style="text-align: left">';
-echo '<input type="submit" name="submit_download" value="'
-    , __('Download') , '" class="green" />';
-echo '</td>';
-echo '</tr>';
-
-echo FormDisplayTemplate::displayFieldsetBottom(false);
-echo FormDisplayTemplate::displayFormBottom();
+$config_readable = false;
+$config_writable = false;
+$config_exists = false;
+check_config_rw($config_readable, $config_writable, $config_exists);
+?>
+<h2><?php echo $GLOBALS['strSetupConfigurationFile'] ?></h2>
+<?php display_form_top('config.php'); ?>
+<input type="hidden" name="eol" value="<?php echo htmlspecialchars(PMA_ifSetOr($_GET['eol'], 'unix')) ?>" />
+<?php display_fieldset_top('', '', null, array('class' => 'simple')); ?>
+<tr>
+    <td>
+        <textarea cols="50" rows="20" name="textconfig" id="textconfig" spellcheck="false"><?php
+            echo htmlspecialchars(ConfigFile::getInstance()->getConfigFile())
+        ?></textarea>
+    </td>
+</tr>
+<tr>
+    <td class="lastrow" style="text-align: left">
+        <input type="submit" name="submit_download" value="<?php echo $GLOBALS['strSetupDownload'] ?>" class="green" />
+        <input type="submit" name="submit_save" value="<?php echo $GLOBALS['strSave'] ?>"<?php if (!$config_writable) echo ' disabled="disabled"' ?> />
+    </td>
+</tr>
+<?php
+display_fieldset_bottom_simple();
+display_form_bottom();
+?>
